@@ -11,6 +11,9 @@ window.playerA = new (class PlayerControl {
       this.allEnemyTank = [];
 
       this.MAX_DISTANCE = 0;
+      //是否需要开火
+      this.isneedfire = false;
+      this.mustfire = false;
     }
   
     land() {
@@ -39,8 +42,6 @@ window.playerA = new (class PlayerControl {
                   enr = c
               }           
           }
-          //console.log("=============1c id:"+c['id'])
-          //console.log("=============1this.type:"+this.type)
       });
       const currentTank = cur
       this.enemyTank = enr
@@ -98,12 +99,8 @@ window.playerA = new (class PlayerControl {
       
       this.#calcBulletArray(enemyBullets, currentTankX, currentTankY, BulletArray, currentTankWH, bulletWH)
       this.#calcBulletArrayisCollideWall(currentTankX, currentTankY, CollideWallArray, currentTankWH, bulletWH)
-      //console.log(BulletArray)
-      //console.log(CollideWallArray)
       
-      //是否需要开火
-      var isneedfire = false
-      var mustfire = false
+
       
       //进攻还是躲避
       var isattack = true
@@ -151,23 +148,21 @@ window.playerA = new (class PlayerControl {
       if(BulletArray[1][4] != this.#DIRECTION.STOP){
           this.firstBullet = false
       } 
-      /*
-      //保守型（子弹矩阵内没子弹才进攻）
-      for(var i1=0;i1<BulletArray.length;i1++){
-          for(var j1 =0;j1<BulletArray[i1].length; j1++){
-              if(BulletArray[i1][j1] != this.#DIRECTION.STOP){
-                  isattack = false
-                  break
-              }
-          }
-      } 
-      */
-      
       console.log("LasttimeDefendAttackState ==========", this.LasttimeDefendAttackState) 
       if(isattack){
-          moveDirection = this.#attackWithBulletArray(enemyTanks, currentTankX, currentTankY, currentTankWH, BulletArray, moveDirection, CollideWallArray)//计算攻击方向
-          this.LasttimeDefendAttackState = "attack"
-          console.log("attackWithBulletArray moveDirection", moveDirection) 
+          if(enemyTanks == null ){
+            // attackWithBulletArrayJustEmeny
+            moveDirection = this.#attackWithBulletArrayJustEmeny( currentTankX, currentTankY, currentTankWH, BulletArray, moveDirection, CollideWallArray)//计算攻击方向
+            this.LasttimeDefendAttackState = "attack"
+            console.log("attackWithBulletArray moveDirection", moveDirection) 
+          }else{
+            moveDirection = this.#attackWithBulletArray(enemyTanks, currentTankX, currentTankY, currentTankWH, BulletArray, moveDirection, CollideWallArray)//计算攻击方向
+            this.LasttimeDefendAttackState = "attack"
+            console.log("attackWithBulletArray moveDirection", moveDirection) 
+          }
+        //   moveDirection = this.#attackWithBulletArray(enemyTanks, currentTankX, currentTankY, currentTankWH, BulletArray, moveDirection, CollideWallArray)//计算攻击方向
+        //   this.LasttimeDefendAttackState = "attack"
+        //   console.log("attackWithBulletArray moveDirection", moveDirection) 
       }else{
           moveDirection = this.#avoidBulletWithBulletArray(currentTankX, currentTankY, currentTankWH, BulletArray, moveDirection, CollideWallArray)//计算躲避方向
           this.LasttimeDefendAttackState = "defend"
@@ -182,8 +177,9 @@ window.playerA = new (class PlayerControl {
       
       //todo 这里需要改变一下，开局向上攻击可以适当改为选择最优方向离开
       let direction=this.#traceAndFireV2();
+    //   moveDirection=direction;
 
-      //开局时向上攻击优先
+      //开局时向左攻击优先
       //if(moveDirection == this.#DIRECTION.UP && currentTankX <= 300 && enemyTanks.length > 12){//enemyTanks.length > 12是因为旗鼓相当的时候，这个值降得很快
       if(this.priority == this.#DIRECTION.DOWN && currentTankX <= 300 && enemyTanks.length > 12){//enemyTanks.length > 12是因为旗鼓相当的时候，这个值降得很快
           if (c - this.firetimestamp > 50) {
@@ -195,7 +191,7 @@ window.playerA = new (class PlayerControl {
       }
       if(this.mustfire){
           if (c - this.firetimestamp > 40) {//20毫秒=1个tick，所以firetimestamp应该为20的整数倍
-            console.log("fast fire5========",this.priority) 
+            console.log("fast fire4========",this.priority) 
             this.firetimestamp = c
             this.#fire();
             document.onkeyup(this.#fireEv);
@@ -505,17 +501,6 @@ window.playerA = new (class PlayerControl {
               //四个主要方向上的致命判断
               var dis2 = false
               if(bullet.direction == this.#DIRECTION.DOWN){//currentTankX和currentTankY是坦克的左上点，bullet.X和bullet.Y是子弹中心点，所以计算有些差异
-                  //for debug
-                  /*if(j==-1 && i==0){
-                      console.log("=============xxxxbullet.X:"+bullet.X)
-                      console.log("=============bullet.Y:"+bullet.Y)
-                      console.log("=============currentTankX:"+currentTankX)
-                      console.log("=============currentTankY:"+currentTankY)
-                      console.log(currentTankY-(bullet.Y+5))
-                      console.log((bullet.X-5)-currentTankX)
-                  }
-                  console.log("=============xxxx0")*/
-                  
                   dis2 = this.#collision(//这颗子弹和这个宫格发生了碰撞
                     currentTankX-5 + 0,
                     currentTankY - thresholdvalue,
@@ -541,22 +526,6 @@ window.playerA = new (class PlayerControl {
                       Bullet[j+2][i+2] = this.MustDIRECTION.mustLEFT
                       break outer//既然有必须要躲的了，就不用再计算了                    
                   }                
-                  
-                  /*一开始写的方法，太绕
-                  if(currentTankY-(bullet.Y+5) > 0 && currentTankY-(bullet.Y+5) < thresholdvalue){//子弹在坦克上方，且Y方向小于安全距离
-                      console.log("=============xxxx2")
-                      if((bullet.X-5)-currentTankX >= 0 && (bullet.X+5)-currentTankX <= 25){//子弹在坦克左半边
-                          console.log("=============xxxx3")
-                          Bullet[j+2][i+2] = this.MustDIRECTION.mustRIGHT
-                          break outer//既然有必须要躲的了，就不用再计算了
-                      }
-                      if((bullet.X-5)-(currentTankX+25) >= 0 && (bullet.X+5)-(currentTankX+25) <= 25){//子弹在坦克右半边
-                          console.log("=============xxxx4")
-                          Bullet[j+2][i+2] = this.MustDIRECTION.mustLEFT
-                          break outer
-                      }
-                  }
-                  */
               }
               
               if(bullet.direction == this.#DIRECTION.UP){
@@ -587,32 +556,9 @@ window.playerA = new (class PlayerControl {
                       break outer//既然有必须要躲的了，就不用再计算了                    
                   }  
                   
-                  /*一开始写的方法，太绕
-                  if((currentTankY+50)-(bullet.Y-5) < 0 && (bullet.Y-5)-(currentTankY+50) < thresholdvalue){//子弹在坦克下方，且Y方向小于安全距离
-                      if((bullet.X-5)-currentTankX >= 0 && (bullet.X+5)-currentTankX <= 25){//子弹在坦克左半边
-                          Bullet[j+2][i+2] = this.MustDIRECTION.mustRIGHT
-                          break outer
-                      }
-                      if((bullet.X-5)-(currentTankX+25) >= 0 && (bullet.X+5)-(currentTankX+25) <= 25){//子弹在坦克右半边
-                          Bullet[j+2][i+2] = this.MustDIRECTION.mustLEFT
-                          break outer
-                      }
-                  }
-                  */
               }
               
-              if(bullet.direction == this.#DIRECTION.LEFT){
-                  //for debug
-                  /*if(j==0 && i==1){
-                      console.log("=============xxxxbullet.X:"+bullet.X)
-                      console.log("=============bullet.Y:"+bullet.Y)
-                      console.log("=============currentTankX:"+currentTankX)
-                      console.log("=============currentTankY:"+currentTankY)
-                      console.log((currentTankX+50)-(bullet.X-5))
-                      console.log((bullet.Y-5)-currentTankY)
-                  }
-                  console.log("=============xxxx5")*/
-                  
+              if(bullet.direction == this.#DIRECTION.LEFT){   
                   dis2 = this.#collision(//这颗子弹和这个宫格发生了碰撞
                     currentTankX + 50 + thresholdvalue,
                     currentTankY-5 + 0,
@@ -787,7 +733,7 @@ window.playerA = new (class PlayerControl {
                       Bullet[j+2][i+2] = bullet.direction//经过以上各种计算，这个宫格还是空，就把子弹方向赋值过去
               }               
                   
-              /*switch (bullet.direction) {//在子弹方向上延长一格，以提高预测性
+              switch (bullet.direction) {//在子弹方向上延长一格，以提高预测性
                 case this.#DIRECTION.UP:
                   if(j+2-1>0){
                     Bullet[j+2-1][i+2] = bullet.direction
@@ -808,7 +754,7 @@ window.playerA = new (class PlayerControl {
                     Bullet[j+2][i+2+1] = bullet.direction
                   }
                   break;
-              }*/
+              }
               //console.log("=============Bullet i:"+i+" j:"+j+" direction:"+bullet.direction)
             }
           }
@@ -940,95 +886,77 @@ window.playerA = new (class PlayerControl {
         if(moveDirection != "safe"){
           return  moveDirection
         }
-          
-        /*
-        //这些是进攻的前提，所以不用再判断一次了
-        
-        if (this.#DIRECTION.DOWN == Bullet[1][2] || this.#DIRECTION.UP == Bullet[3][2] || this.#DIRECTION.UP == Bullet[2][2] || this.#DIRECTION.DOWN == Bullet[2][2]) { //必须左右移动
-          console.log("noattack1=============")
-          return "noattack"
-        }
-        if (this.#DIRECTION.RIGHT == Bullet[2][1] || this.#DIRECTION.LEFT == Bullet[2][3] || this.#DIRECTION.RIGHT == Bullet[2][2] || this.#DIRECTION.LEFT == Bullet[2][2]) { //必须上下移动
-          console.log("noattack2=============")
-          return "noattack"
-        }
-        if(Bullet[1][2] > 4 || Bullet[3][2] > 4 || BulletArray[2][1] > 4 || Bullet[2][3] > 4){//是否有威胁
-          console.log("noattack3=============")
-          return "noattack"
-        }
-        if(Bullet[2][2] != this.#DIRECTION.STOP){
-          console.log("noattack4=============")
-          return "noattack"
-        }
-        */
         
         //寻找最近的坦克
         var nearestEnemy = undefined
         var nearestdis = 9999
-  
-        for (var enemy of enemyTanks) {
-          var dis = this.#calcTwoPointDistance(
-            currentTankX,
-            currentTankY,
-              enemy.X,
-              enemy.Y 
-          );
-      
-          if(enemy != this.enr){//这是判断是不是对手的坦克
-              if(enemyTanks.length > 16){
-                  if(enemy.X > 5 && enemy.Y > 5 && enemy.X < canvas.width-5 && enemy.Y < canvas.height-5){//不能太靠边，太靠边的敌人就不追了（有个问题就是你的敌人都靠边了，你的坦克就开始向对面跑了），已经有MustDIRECTION.WallorMetal了，所以这个可以取消了
-                      if (nearestdis > dis) {
-                        nearestdis = dis;
-                        nearestEnemy = enemy;
-                      } 
-                  }    
-              }else{
-                      if (nearestdis > dis) {
-                        nearestdis = dis;
-                        nearestEnemy = enemy;
-                      } 
+
+
+            for (var enemy of enemyTanks) {
+                var dis = this.#calcTwoPointDistance(
+                  currentTankX,
+                  currentTankY,
+                    enemy.X,
+                    enemy.Y 
+                );
+            
+                if(enemy != this.enr){//这是判断是不是对手的坦克
+                    if(enemyTanks.length > 15){//16个坦克界限
+                        if(enemy.X > 5 && enemy.Y > 5 && enemy.X < canvas.width-5 && enemy.Y < canvas.height-5){//不能太靠边，太靠边的敌人就不追了（有个问题就是你的敌人都靠边了，你的坦克就开始向对面跑了），已经有MustDIRECTION.WallorMetal了，所以这个可以取消了
+                            if (nearestdis > dis) {
+                              nearestdis = dis;
+                              nearestEnemy = enemy;
+                            } 
+                        }    
+                    }else{
+                            if (nearestdis > dis) {
+                              nearestdis = dis;
+                              nearestEnemy = enemy;
+                            } 
+                    }
+                }
               }
-          }
-        }
-  
+        
         //向最近的坦克移动
         if (undefined != nearestEnemy) {
           var disX = Math.abs(nearestEnemy.X - currentTankX)
           var disY = Math.abs(nearestEnemy.Y - currentTankY)
+          //改动
+        //   if((disX<60 && disY<60)){
+        //       this.mustfire = true
+        //   }
           
-          //console.log("disX=============", disX)
-          //console.log("disY=============", disY)
-          //console.log("nearestEnemy.X=============", nearestEnemy.X)
-          //console.log("nearestEnemy.Y=============", nearestEnemy.Y)
-          //console.log("currentTankX=============", currentTankX)
-          //console.log("currentTankY=============", currentTankY)
-          //console.log("Bullet[1][1]=============", Bullet[1][1])
-          //console.log("this.#DIRECTION.STOP=============", this.#DIRECTION.STOP)
+        //   if((disX<250 && disY<100)){//80就是安全距离，ai坦克应该躲不开了
+        //       this.isneedfire = true
+        //   }
           
-          if((disX<60 && disY<60)){
+        //   if((disX<100 && disY<250)){
+        //       this.isneedfire = true
+        //   }
+        if((disX<80 && disY<80)){
               this.mustfire = true
           }
           
-          if((disX<250 && disY<100)){//80就是安全距离，ai坦克应该躲不开了
+          if((disX<200 && disY<100)){//80就是安全距离，ai坦克应该躲不开了
               this.isneedfire = true
           }
           
-          if((disX<100 && disY<250)){
+          if((disX<100 && disY<200)){
               this.isneedfire = true
           }
-          
+
           //这两个值大了就会来回抖动，浪费时间；小了容易暴毙
-          var safedis1=150
-          var safedis2=150
+          var safedis1=170
+          var safedis2=170
           
           if(enemyTanks.length > 15){
             //if((disX + disY) < 200){
             if((disX<safedis1 && disY<safedis1)){//安全距离
                 //优先躲子弹，太保守了，反而容易死
-                moveDirection = this.#avoidBulletWithBulletArrayEasy(currentTankX, currentTankY, currentTankWH, Bullet, moveDirection)
-                if(moveDirection != "safe"){
-                  return  moveDirection
-                }
+                // moveDirection = this.#avoidBulletWithBulletArrayEasy(currentTankX, currentTankY, currentTankWH, Bullet, moveDirection)
+                // if(moveDirection != "safe"){
+                //   return  moveDirection
+                // }
                 
                 //再躲坦克
                 if ((disX < disY) && (nearestEnemy.Y < currentTankY) && this.#DIRECTION.RIGHT != Bullet[3][1] && this.#DIRECTION.STOP == Bullet[3][2] && this.#DIRECTION.LEFT != Bullet[3][3] && this.#DIRECTION.UP != Bullet[4][2]) {
@@ -1092,7 +1020,13 @@ window.playerA = new (class PlayerControl {
                       }                       
                   }                  
                 }
-                console.log("躲避============= null")
+                
+                //先躲避坦克再躲避子弹
+                moveDirection = this.#avoidBulletWithBulletArrayEasy(currentTankX, currentTankY, currentTankWH, Bullet, moveDirection)
+                if(moveDirection != "safe"){
+                   return  moveDirection
+                 }
+                console.log("躲避============= ")
                 return "noattack"
               }    
           }else{
@@ -1103,7 +1037,7 @@ window.playerA = new (class PlayerControl {
                 if(moveDirection != "safe"){
                   return  moveDirection
                 }
-                
+                // logic moveDirection == safe
                 //再躲坦克
                 if ((disX < disY) && (nearestEnemy.Y < currentTankY) && this.#DIRECTION.RIGHT != Bullet[3][1] && this.#DIRECTION.STOP == Bullet[3][2] && this.#DIRECTION.LEFT != Bullet[3][3] && this.#DIRECTION.UP != Bullet[4][2]) {
                   if(this.LasttimeDefendAttackState == "defend" && this.priority != this.#DIRECTION.DOWN){//上一步在躲致命攻击，就不要再反方向回去了
@@ -1176,7 +1110,7 @@ window.playerA = new (class PlayerControl {
           var firedis = 35
           if(disX < firedis && (nearestEnemy.Y < currentTankY) && this.#DIRECTION.RIGHT != Bullet[1][1] && this.#DIRECTION.STOP == Bullet[1][2] && this.#DIRECTION.LEFT != Bullet[1][3] && this.#DIRECTION.DOWN != Bullet[0][2]) {
               if(this.LasttimeDefendAttackState == "defend" && this.priority != this.#DIRECTION.UP){
-  
+                
               }else{
                   if (moveDirection != this.#DIRECTION.UP) {
                     moveDirection = this.#DIRECTION.UP  
@@ -1251,7 +1185,7 @@ window.playerA = new (class PlayerControl {
               }
               
               //激进，直接扫射AI出生点，距离左边线200开始向上开炮，最多上移至距上边线200的位置，因为200，200就是出生点了
-              /*if(currentTankX < canvas.width/2){
+              if(currentTankX < canvas.width/2){
                   if(currentTankX > 150 && this.#DIRECTION.STOP == Bullet[2][1] && this.#DIRECTION.RIGHT != Bullet[2][0] && this.#DIRECTION.DOWN != Bullet[1][1] && this.#DIRECTION.UP != Bullet[3][1]){
                       if(this.LasttimeDefendAttackState == "defend" && this.priority != this.#DIRECTION.LEFT){
                       }else{
@@ -1283,7 +1217,7 @@ window.playerA = new (class PlayerControl {
                           return this.#DIRECTION.UP;                        
                       }  
                   }                
-              }*/
+              }
               
               //保守
               /*if ((nearestEnemy.X >= currentTankX) && this.#DIRECTION.DOWN != Bullet[1][3] && this.#DIRECTION.STOP == Bullet[2][3] && this.#DIRECTION.UP != Bullet[3][3]) {
@@ -1309,9 +1243,14 @@ window.playerA = new (class PlayerControl {
   
                   }else{
                       if(CollideWallArray[2][3] == this.MustDIRECTION.WallorMetal && enemyTanks.length > 13){
-                          
+                          //右边为墙体
                       }else{
-                          chaseRIGHT = true 
+                          if(CollideWallArray[2][4] == this.MustDIRECTION.WallorMetal){
+                            chaseRIGHT = false 
+                          }else{
+                            chaseRIGHT = true 
+                          }
+                          
                       }                        
                   }   
               } 
@@ -1455,6 +1394,10 @@ window.playerA = new (class PlayerControl {
           }
   
           return "safe"//都不安全，保持当前方向
+    }
+    avoidBulletWithBulletArrayEasy2(currentTankX, currentTankY, currentTankWH, Bullet, moveDirection, CollideWallArray) {//周围没必躲子弹时的最优方向
+        //处理躲子弹的逻辑
+
     }
     
     #avoidBulletWithBulletArray(currentTankX, currentTankY, currentTankWH, Bullet, moveDirection, CollideWallArray) {
@@ -1754,6 +1697,319 @@ window.playerA = new (class PlayerControl {
         }
       }
       return false
+    }
+    #attackWithBulletArrayJustEmeny(currentTankX, currentTankY, currentTankWH, Bullet, moveDirection, CollideWallArray) {
+        var ismust = this.#checkMustDirection(Bullet)
+        console.log("ismust=============", ismust)
+        if(ismust != "nomust"){
+            this.LasttimeDefendAttackState = "defend"
+            return ismust;
+        }
+        
+        //优先躲子弹
+        moveDirection = this.#avoidBulletWithBulletArrayEasy(currentTankX, currentTankY, currentTankWH, Bullet, moveDirection, CollideWallArray)
+        if(moveDirection != "safe"){
+          return  moveDirection
+        }
+        
+        //寻找最近的坦克
+        var nearestEnemy = undefined
+        var nearestdis = 9999
+
+        if(enemyTanks.length == 0){
+            var dis = this.#calcTwoPointDistance(
+                currentTankX,
+                currentTankY,
+                  this.enemyTank.X,
+                  this.enemyTank.Y 
+              );
+
+              if (nearestdis > dis) {
+                nearestdis = dis;
+                nearestEnemy = this.enemyTank;
+              } 
+        }
+        //向最近的坦克移动
+        if (undefined != nearestEnemy) {
+          var disX = Math.abs(nearestEnemy.X - currentTankX)
+          var disY = Math.abs(nearestEnemy.Y - currentTankY)
+        if((disX<80 && disY<80)){
+              this.mustfire = true
+          }
+          
+          if((disX<200 && disY<100)){//80就是安全距离，ai坦克应该躲不开了
+              this.isneedfire = true
+          }
+          
+          if((disX<100 && disY<200)){
+              this.isneedfire = true
+          }
+          //仅仅剩下敌方坦克
+          //这两个值大了就会来回抖动，浪费时间；小了容易暴毙
+          var safedis1=170
+          var safedis2=170
+              //if((disX + disY) < 170){
+              if((disX<safedis2 && disY<safedis2)){
+                //优先躲子弹
+                moveDirection = this.#avoidBulletWithBulletArrayEasy(currentTankX, currentTankY, currentTankWH, Bullet, moveDirection, CollideWallArray)
+                if(moveDirection != "safe"){
+                  return  moveDirection
+                }
+                //再躲坦克
+                if ((disX < disY) && (nearestEnemy.Y < currentTankY) && this.#DIRECTION.RIGHT != Bullet[3][1] && this.#DIRECTION.STOP == Bullet[3][2] && this.#DIRECTION.LEFT != Bullet[3][3] && this.#DIRECTION.UP != Bullet[4][2]) {
+                  if(this.LasttimeDefendAttackState == "defend" && this.priority != this.#DIRECTION.DOWN){//上一步在躲致命攻击，就不要再反方向回去了
+  
+                  }else{
+                      if(this.LasttimeDefendAttackState == "attack" && this.priority == this.#DIRECTION.UP){//防抖动
+                          this.isneedfire = true
+                          console.log("太近了=============躲避", this.#DIRECTION.STOP)//离敌方坦克很近了，停一步准备开火
+                          return this.#DIRECTION.STOP;                         
+                      }
+                      if(CollideWallArray[3][2] != this.MustDIRECTION.WallorMetal){//如果下移会撞墙，就不返回，继续执行下面的调整炮口或追击
+                          this.LasttimeDefendAttackState == "attackwithdefend"
+                          console.log("太近了=============躲避", this.#DIRECTION.DOWN)
+                          return this.#DIRECTION.DOWN;  
+                      }
+                  }
+                } else if ((disX < disY) && (nearestEnemy.Y >= currentTankY) && this.#DIRECTION.RIGHT != Bullet[1][1] && this.#DIRECTION.STOP == Bullet[1][2] && this.#DIRECTION.LEFT != Bullet[1][3] && this.#DIRECTION.DOWN != Bullet[0][2]) {
+                  if(this.LasttimeDefendAttackState == "defend" && this.priority != this.#DIRECTION.UP){
+  
+                  }else{
+                      if(this.LasttimeDefendAttackState == "attack" && this.priority == this.#DIRECTION.DOWN){
+                          this.isneedfire = true
+                          console.log("太近了=============躲避", this.#DIRECTION.STOP)
+                          return this.#DIRECTION.STOP;                         
+                      }
+                      if(CollideWallArray[1][2] != this.MustDIRECTION.WallorMetal){//如果下移会撞墙，就不返回，继续执行下面的调整炮口或追击
+                          this.LasttimeDefendAttackState == "attackwithdefend"
+                          console.log("太近了=============躲避", this.#DIRECTION.UP)
+                          return this.#DIRECTION.UP; 
+                      }                                                   
+                  }                
+                } else if ((disX >= disY) && (nearestEnemy.X >= currentTankX) && this.#DIRECTION.DOWN != Bullet[1][1] && this.#DIRECTION.STOP == Bullet[2][1] && this.#DIRECTION.UP != Bullet[3][1] && this.#DIRECTION.RIGHT != Bullet[2][0]) {
+                  if(this.LasttimeDefendAttackState == "defend" && this.priority != this.#DIRECTION.LEFT){
+  
+                  }else{
+                      if(this.LasttimeDefendAttackState == "attack" && this.priority == this.#DIRECTION.RIGHT){
+                          this.isneedfire = true
+                          console.log("太近了=============躲避", this.#DIRECTION.STOP)
+                          return this.#DIRECTION.STOP;                         
+                      }
+                      if(CollideWallArray[2][1] != this.MustDIRECTION.WallorMetal){//如果下移会撞墙，就不返回，继续执行下面的调整炮口或追击
+                          this.LasttimeDefendAttackState == "attackwithdefend"
+                          console.log("太近了=============躲避", this.#DIRECTION.LEFT)
+                          return this.#DIRECTION.LEFT;  
+                      }                       
+                  }                      
+                } else if ((disX >= disY) && (nearestEnemy.X < currentTankX) && this.#DIRECTION.DOWN != Bullet[1][3] && this.#DIRECTION.STOP == Bullet[2][3] && this.#DIRECTION.UP != Bullet[3][3] && this.#DIRECTION.LEFT != Bullet[2][4]) {
+                  if(this.LasttimeDefendAttackState == "defend" && this.priority != this.#DIRECTION.RIGHT){
+  
+                  }else{
+                      if(this.LasttimeDefendAttackState == "attack" && this.priority == this.#DIRECTION.LEFT){
+                          this.isneedfire = true
+                          console.log("太近了=============躲避", this.#DIRECTION.STOP)
+                          return this.#DIRECTION.STOP;                         
+                      }
+                      if(CollideWallArray[2][3] != this.MustDIRECTION.WallorMetal){//如果下移会撞墙，就不返回，继续执行下面的调整炮口或追击
+                          this.LasttimeDefendAttackState == "attackwithdefend"
+                          console.log("太近了=============躲避", this.#DIRECTION.RIGHT)
+                          return this.#DIRECTION.RIGHT;
+                      }                       
+                  }                  
+                }
+                console.log("躲避============= null")
+                return "noattack"
+              }   
+              
+          //计算开炮
+          var firedis = 50
+          if(disX < firedis && (nearestEnemy.Y < currentTankY) && this.#DIRECTION.RIGHT != Bullet[1][1] && this.#DIRECTION.STOP == Bullet[1][2] && this.#DIRECTION.LEFT != Bullet[1][3] && this.#DIRECTION.DOWN != Bullet[0][2]) {
+              if(this.LasttimeDefendAttackState == "defend" && this.priority != this.#DIRECTION.UP){
+  
+              }else{
+                  if (moveDirection != this.#DIRECTION.UP) {
+                    moveDirection = this.#DIRECTION.UP  
+                    console.log("炮口调整", moveDirection)
+                    return this.#DIRECTION.UP;
+                  }else{
+                    this.isneedfire = true
+                    return moveDirection     
+                  }            
+              }  
+          }
+          if(disX < firedis && (nearestEnemy.Y >= currentTankY) && this.#DIRECTION.RIGHT != Bullet[3][1] && this.#DIRECTION.STOP == Bullet[3][2] && this.#DIRECTION.LEFT != Bullet[3][3] && this.#DIRECTION.UP != Bullet[4][2]) {
+                  if(this.LasttimeDefendAttackState == "defend" && this.priority != this.#DIRECTION.DOWN){
+  
+                  }else{
+                      if (moveDirection != this.#DIRECTION.DOWN) {
+                        moveDirection = this.#DIRECTION.DOWN  
+                        console.log("炮口调整", moveDirection)
+                        return this.#DIRECTION.DOWN;
+                      }else{
+                          this.isneedfire = true
+                          return moveDirection      
+                      }         
+                  }              
+          }
+          
+          if(disY < firedis && (nearestEnemy.X < currentTankX) && this.#DIRECTION.DOWN != Bullet[1][1] && this.#DIRECTION.STOP == Bullet[2][1] && this.#DIRECTION.UP != Bullet[3][1] && this.#DIRECTION.RIGHT != Bullet[2][0]) {
+                  if(this.LasttimeDefendAttackState == "defend" && this.priority != this.#DIRECTION.LEFT){
+  
+                  }else{
+                      if (moveDirection != this.#DIRECTION.LEFT) {
+                        moveDirection = this.#DIRECTION.LEFT  
+                        console.log("炮口调整", moveDirection)
+                        return this.#DIRECTION.LEFT;
+                      }else{
+                          this.isneedfire = true
+                          return moveDirection    
+                      }            
+                  }              
+          }
+          
+          if(disY < firedis && (nearestEnemy.X >= currentTankX) && this.#DIRECTION.DOWN != Bullet[1][3] && this.#DIRECTION.STOP == Bullet[2][3] && this.#DIRECTION.UP != Bullet[3][3] && this.#DIRECTION.LEFT != Bullet[2][4]) {
+                  if(this.LasttimeDefendAttackState == "defend" && this.priority != this.#DIRECTION.RIGHT){
+  
+                  }else{
+                      if (moveDirection != this.#DIRECTION.RIGHT) {
+                        moveDirection = this.#DIRECTION.RIGHT  
+                        console.log("炮口调整", moveDirection)
+                        return this.#DIRECTION.RIGHT;
+                      }else{
+                          this.isneedfire = true
+                          return moveDirection  
+                      }             
+                  }              
+  
+          }        
+          
+          //计算移动
+          //if(enemyTanks.length > 16){
+          var chaseUP = false
+          var chaseDOWN = false
+          var chaseLEFT = false
+          var chaseRIGHT = false
+          if(this.firstBullet){
+              //开局时优先在x方向上移动，因为Y上面水平子弹太密集
+              if(currentTankX < canvas.width/2){
+                  return this.#DIRECTION.LEFT;        
+              }else{
+                  if(currentTankX < canvas.width/2 -200){//这是应为B更危险
+                      return this.#DIRECTION.RIGHT;   
+                  }       
+              }
+              
+              //激进，直接扫射AI出生点，距离左边线200开始向上开炮，最多上移至距上边线200的位置，因为200，200就是出生点了
+              if(currentTankX < canvas.width/2){
+                  if(currentTankX > 150 && this.#DIRECTION.STOP == Bullet[2][1] && this.#DIRECTION.RIGHT != Bullet[2][0] && this.#DIRECTION.DOWN != Bullet[1][1] && this.#DIRECTION.UP != Bullet[3][1]){
+                      if(this.LasttimeDefendAttackState == "defend" && this.priority != this.#DIRECTION.LEFT){
+                      }else{
+                          console.log("追击1=============", this.#DIRECTION.LEFT)
+                          return this.#DIRECTION.LEFT;                        
+                      }
+                  }
+                  
+                  if(currentTankY > 250 && this.#DIRECTION.STOP == Bullet[1][2] && this.#DIRECTION.DOWN != Bullet[0][2] && this.#DIRECTION.RIGHT != Bullet[1][1] && this.#DIRECTION.LEFT != Bullet[1][3]){
+                      if(this.LasttimeDefendAttackState == "defend" && this.priority != this.#DIRECTION.UP){
+                      }else{
+                          console.log("追击2=============", this.#DIRECTION.UP)
+                          return this.#DIRECTION.UP;                        
+                      }  
+                  }                
+              }else{
+                  if(currentTankX < canvas.width-150 && this.#DIRECTION.STOP == Bullet[2][3] && this.#DIRECTION.LEFT != Bullet[2][4] && this.#DIRECTION.DOWN != Bullet[1][3] && this.#DIRECTION.UP != Bullet[3][3]){
+                      if(this.LasttimeDefendAttackState == "defend" && this.priority != this.#DIRECTION.RIGHT){
+                      }else{
+                          console.log("追击1=============", this.#DIRECTION.RIGHT)
+                          return this.#DIRECTION.RIGHT;                        
+                      }
+                  }
+                  
+                  if(currentTankY > 250 && this.#DIRECTION.STOP == Bullet[1][2] && this.#DIRECTION.DOWN != Bullet[0][2] && this.#DIRECTION.RIGHT != Bullet[1][1] && this.#DIRECTION.LEFT != Bullet[1][3]){
+                      if(this.LasttimeDefendAttackState == "defend" && this.priority != this.#DIRECTION.UP){
+                      }else{
+                          console.log("追击2=============", this.#DIRECTION.UP)
+                          return this.#DIRECTION.UP;                        
+                      }  
+                  }                
+              }
+          }else{
+              //残局时均衡移动
+              //if ((disX >= disY) && (nearestEnemy.X >= currentTankX) && this.#DIRECTION.DOWN != Bullet[1][3] && this.#DIRECTION.STOP == Bullet[2][3] && this.#DIRECTION.UP != Bullet[3][3]) {
+              if ((nearestEnemy.X >= currentTankX) && this.#DIRECTION.DOWN != Bullet[1][3] && this.#DIRECTION.STOP == Bullet[2][3] && this.#DIRECTION.UP != Bullet[3][3]) {    
+                  if(this.LasttimeDefendAttackState == "defend" && this.priority != this.#DIRECTION.RIGHT){
+  
+                  }else{
+                      if(CollideWallArray[2][3] == this.MustDIRECTION.WallorMetal && enemyTanks.length > 13){
+                          
+                      }else{
+                          chaseRIGHT = true 
+                      }                        
+                  }   
+              } 
+              //if ((disX >= disY) && (nearestEnemy.X < currentTankX) && this.#DIRECTION.DOWN != Bullet[1][1] && this.#DIRECTION.STOP == Bullet[2][1] && this.#DIRECTION.UP != Bullet[3][1]) {
+              if ((nearestEnemy.X < currentTankX) && this.#DIRECTION.DOWN != Bullet[1][1] && this.#DIRECTION.STOP == Bullet[2][1] && this.#DIRECTION.UP != Bullet[3][1]) {    
+                  if(this.LasttimeDefendAttackState == "defend" && this.priority != this.#DIRECTION.LEFT){
+  
+                  }else{
+                      if(CollideWallArray[2][1] == this.MustDIRECTION.WallorMetal && enemyTanks.length > 13){
+                          
+                      }else{                    
+                          chaseLEFT = true
+                      }                        
+                  }    
+              }            
+          }
+                
+          //if ((disX < disY) && (nearestEnemy.Y < currentTankY) && this.#DIRECTION.RIGHT != Bullet[1][1] && this.#DIRECTION.STOP == Bullet[1][2] && this.#DIRECTION.LEFT != Bullet[1][3]) {
+          if ((nearestEnemy.Y < currentTankY) && this.#DIRECTION.RIGHT != Bullet[1][1] && this.#DIRECTION.STOP == Bullet[1][2] && this.#DIRECTION.LEFT != Bullet[1][3]) {
+                  if(this.LasttimeDefendAttackState == "defend" && this.priority != this.#DIRECTION.UP){
+  
+                  }else{
+                      if(CollideWallArray[1][2] == this.MustDIRECTION.WallorMetal && enemyTanks.length > 13){
+                          
+                      }else{
+                          chaseUP = true                      
+                      }
+                  }  
+          } 
+          
+          //if ((disX < disY) && (nearestEnemy.Y >= currentTankY)&& this.#DIRECTION.RIGHT != Bullet[3][1] && this.#DIRECTION.STOP == Bullet[3][2] && this.#DIRECTION.LEFT != Bullet[3][3]) {
+          if ((nearestEnemy.Y >= currentTankY)&& this.#DIRECTION.RIGHT != Bullet[3][1] && this.#DIRECTION.STOP == Bullet[3][2] && this.#DIRECTION.LEFT != Bullet[3][3]) {    
+                  if(this.LasttimeDefendAttackState == "defend" && this.priority != this.#DIRECTION.DOWN){
+  
+                  }else{
+                      if(CollideWallArray[3][2] == this.MustDIRECTION.WallorMetal && enemyTanks.length > 13){
+                          
+                      }else{
+                          chaseDOWN = true                          
+                      }                 
+                  }
+          } 
+  
+          if(chaseRIGHT == true){
+              console.log("追击22=============右")
+              return this.#DIRECTION.RIGHT
+          }
+  
+          if(chaseLEFT == true){
+              console.log("追击22=============左")
+              return this.#DIRECTION.LEFT
+          }
+  
+          if(chaseUP == true){
+              console.log("追击22=============上")
+              return this.#DIRECTION.UP
+          }
+          
+          if(chaseDOWN == true){
+              console.log("追击22=============下")
+              return this.#DIRECTION.DOWN
+          } 
+          
+          console.log("追击============= null")
+          return "noattack"
+        }
     }
   })("A");
   
